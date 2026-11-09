@@ -29,15 +29,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python }}
+      # A current interpreter to *run* tox with. The version under test is
+      # provided by tox-uv (see UV_PYTHON_PREFERENCE below), not by this step:
+      # `setup-python` can only install what the runner image ships, and
+      # today's `ubuntu-latest` (Ubuntu 26.04) has no Python 3.9, which
+      # reached end of life in October 2025. The library still supports it,
+      # so the matrix must not depend on the image.
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
+          python-version: "3.12"
 
       - name: Install tox
         run: python -m pip install --upgrade pip tox tox-uv
 
       - name: Run tests
+        env:
+          # Makes uv download the exact interpreter each environment asks for.
+          UV_PYTHON_PREFERENCE: only-managed
         run: python -m tox -e ${{ matrix.toxenv }}
 
   extras:
