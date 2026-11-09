@@ -5,6 +5,29 @@ All notable changes to this project are documented here.
 This project is a fork of [drf-flex-fields](https://github.com/rsinger86/drf-flex-fields);
 the upstream changelog is preserved in the [README](README.md#changelog).
 
+## 1.0.1 - 2026-11-09
+
+**No changes to the installed package.** The library and the compatibility shim are
+functionally identical to 1.0; only repository tooling changed, and `.github/` is not
+part of either distribution. This version exists so that the first release published
+through the automated workflow is a real upload, rather than a re-upload of 1.0 that
+PyPI would reject.
+
+### Fixed
+
+- CI: the Python 3.9 job failed in `Set up Python` without running a test.
+  `ubuntu-latest` is now Ubuntu 26.04, for which `actions/python-versions` does not
+  publish Python 3.9 - it reached end of life in October 2025. `setup-python` is now
+  pinned to 3.12 purely to run tox, and `UV_PYTHON_PREFERENCE=only-managed` makes uv
+  download the interpreter each tox environment asks for, so the matrix no longer
+  depends on what the runner image ships. Python 3.9 remains supported and tested
+  (Django 4.2 with DRF 3.15 and 3.16).
+
+### Changed
+
+- Repository URLs point at `github.com/thomazs/mind-drf-flex-fields` in both
+  distributions' metadata.
+
 ## 1.0 - 2026-11-05
 
 First release of the `mind-drf-flex-fields` fork, based on `drf-flex-fields` 1.0.2.
