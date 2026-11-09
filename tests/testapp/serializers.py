@@ -2,7 +2,15 @@ from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
 from mind_flex_fields import FlexFieldsModelSerializer
-from tests.testapp.models import Pet, PetStore, Person, Company, TaggedItem
+from tests.testapp.models import (
+    Account,
+    Company,
+    Person,
+    Pet,
+    PetStore,
+    Profile,
+    TaggedItem,
+)
 
 
 class CompanySerializer(FlexFieldsModelSerializer):
@@ -53,3 +61,19 @@ class TaggedItemSerializer(FlexFieldsModelSerializer):
     class Meta:
         model = TaggedItem
         fields = ("id", "content_type", "object_id", "content_object")
+
+
+class AccountSerializer(FlexFieldsModelSerializer):
+    class Meta:
+        model = Account
+        fields = ["login"]
+
+
+class ProfileSerializer(FlexFieldsModelSerializer):
+    class Meta:
+        model = Profile
+        fields = ["bio", "owner", "employer"]
+        expandable_fields = {
+            "owner": "tests.testapp.serializers.AccountSerializer",
+            "employer": "tests.testapp.serializers.CompanySerializer",
+        }

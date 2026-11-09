@@ -34,3 +34,21 @@ class TaggedItem(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey("content_type", "object_id")
+
+
+class Account(models.Model):
+    login = models.CharField(max_length=30)
+
+
+class Profile(models.Model):
+    """Holds a forward one-to-one, the case the query optimizer used to defer.
+
+    `owner` keeps its column on this table and points at a single row, so it is
+    a JOIN - not something to prefetch.
+    """
+
+    bio = models.CharField(max_length=30)
+    owner = models.OneToOneField(
+        Account, on_delete=models.CASCADE, related_name="profile"
+    )
+    employer = models.ForeignKey(Company, null=True, on_delete=models.CASCADE)

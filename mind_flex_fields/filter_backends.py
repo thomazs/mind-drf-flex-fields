@@ -33,6 +33,31 @@ from mind_flex_fields.utils import get_expandable_fields
 WILDCARD_VALUES_JOINED = ",".join(WILDCARD_VALUES or [])
 
 
+def is_forward_single_relation(model_field: models.Field) -> bool:
+    """
+    Whether `model_field` is a relation a single JOIN can follow.
+
+    A forward `ForeignKey` and a forward `OneToOneField` both point at exactly
+    one row and keep their column on this table, so `select_related()` follows
+    them and `only()` has to list them. Django flags the first `many_to_one`
+    and the second `one_to_one`, so testing `many_to_one` alone leaves forward
+    one-to-one fields out: the column gets deferred and the relation is sent to
+    `prefetch_related()`, which costs an extra query for a plain join. It also
+    breaks an unrelated `select_related("<that field>")` the view may have put
+    on the queryset, because Django refuses a field that is "both deferred and
+    traversed using select_related at the same time".
+
+    Everything else is either not single-valued (many-to-many, reverse
+    foreign key) or not concrete (reverse relations, `GenericForeignKey`), and
+    belongs to `prefetch_related()`.
+    """
+    return (
+        model_field.is_relation
+        and (model_field.many_to_one or model_field.one_to_one)
+        and model_field.concrete
+    )
+
+
 class FlexFieldsDocsFilterBackend(BaseFilterBackend):
     """
     A dummy filter backend only for schema/documentation purposes.
@@ -181,14 +206,9 @@ class FlexFieldsFilterBackend(FlexFieldsDocsFilterBackend):
             model_field = self._get_field(field.source, queryset.model)
             if model_field:
                 model_fields.append(model_field)
-                if (
-                    field.field_name in serializer.expanded_fields
-                    or (model_field.is_relation and not model_field.many_to_one)
-                    or (
-                        model_field.is_relation
-                        and model_field.many_to_one
-                        and not model_field.concrete
-                    )
+                if field.field_name in serializer.expanded_fields or (
+                    model_field.is_relation
+                    and not is_forward_single_relation(model_field)
                 ):  # Include GenericForeignKey
                     nested_model_fields.append(model_field)
 
@@ -196,11 +216,8 @@ class FlexFieldsFilterBackend(FlexFieldsDocsFilterBackend):
             only_fields = required_query_fields + [
                 model_field.name
                 for model_field in model_fields
-                if (
-                    not model_field.is_relation
-                    or model_field.many_to_one
-                    and model_field.concrete
-                )
+                if not model_field.is_relation
+                or is_forward_single_relation(model_field)
             ]
             # `only()` with no arguments is a no-op at best; skip it entirely.
             if only_fields:
@@ -210,22 +227,16 @@ class FlexFieldsFilterBackend(FlexFieldsDocsFilterBackend):
             select_related_fields = [
                 model_field.name
                 for model_field in nested_model_fields
-                if (
-                    model_field.is_relation
-                    and model_field.many_to_one
-                    and model_field.concrete
-                )  # Exclude GenericForeignKey
+                if is_forward_single_relation(model_field)
+                # Exclude GenericForeignKey
             ]
 
             prefetch_related_fields = [
                 model_field.name
                 for model_field in nested_model_fields
-                if (model_field.is_relation and not model_field.many_to_one)
-                or (
-                    model_field.is_relation
-                    and model_field.many_to_one
-                    and not model_field.concrete
-                )  # Include GenericForeignKey
+                if model_field.is_relation
+                and not is_forward_single_relation(model_field)
+                # Include GenericForeignKey
             ]
 
             # Both calls must be skipped when there is nothing to follow:

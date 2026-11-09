@@ -5,6 +5,39 @@ All notable changes to this project are documented here.
 This project is a fork of [drf-flex-fields](https://github.com/rsinger86/drf-flex-fields);
 the upstream changelog is preserved in the [README](README.md#changelog).
 
+## Unreleased
+
+### Fixed
+
+- **`FlexFieldsFilterBackend` treated a forward `OneToOneField` as a multi-valued
+  relation.** Django flags a forward `ForeignKey` as `many_to_one` and a forward
+  `OneToOneField` as `one_to_one`, and the query optimizer only tested `many_to_one`.
+  A forward one-to-one was therefore left out of `only()` and handed to
+  `prefetch_related()` - a query where a JOIN would do, and, worse, a field deferred
+  behind the view's back. Any view that select-relates such a field on its own queryset
+  (`queryset = Person.objects.select_related("user")`, the documented way to avoid an
+  N+1) then died with
+
+      FieldError: Field Person.user cannot be both deferred and traversed
+      using select_related at the same time.
+
+  Upstream `drf-flex-fields` has the same defect but hid it: when no concrete
+  `many_to_one` field was found it called `select_related()` with **no arguments**,
+  which means "follow every non-null foreign key" and silently *discarded* the view's
+  explicit `select_related()`. Django does not validate that form against deferred
+  fields, so the conflict never surfaced - the join was simply lost. Release 1.0
+  stopped making that no-argument call, which turned a silent pessimisation into a
+  hard error.
+
+  Classification now goes through the new public helper
+  `is_forward_single_relation()`: a relation is a JOIN when it is concrete and either
+  `many_to_one` or `one_to_one`. Reverse relations, many-to-many and
+  `GenericForeignKey` are unaffected and still go to `prefetch_related()`.
+
+  **This changes the generated SQL** for serializers with a forward one-to-one: the
+  column is selected, the relation is joined instead of prefetched, and one query
+  disappears per request.
+
 ## 1.0.1 - 2026-11-09
 
 **No changes to the installed package.** The library and the compatibility shim are

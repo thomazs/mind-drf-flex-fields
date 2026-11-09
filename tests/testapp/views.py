@@ -1,8 +1,12 @@
 from rest_framework.viewsets import ModelViewSet
 
 from mind_flex_fields import FlexFieldsModelViewSet
-from tests.testapp.models import Pet, TaggedItem
-from tests.testapp.serializers import PetSerializer, TaggedItemSerializer
+from tests.testapp.models import Pet, Profile, TaggedItem
+from tests.testapp.serializers import (
+    PetSerializer,
+    ProfileSerializer,
+    TaggedItemSerializer,
+)
 
 
 class PetViewSet(FlexFieldsModelViewSet):
@@ -18,3 +22,10 @@ class PetViewSet(FlexFieldsModelViewSet):
 class TaggedItemViewSet(ModelViewSet):
     serializer_class = TaggedItemSerializer
     queryset = TaggedItem.objects.all()
+
+
+class ProfileViewSet(FlexFieldsModelViewSet):
+    """Select-relates its forward one-to-one, the way a real project would."""
+
+    serializer_class = ProfileSerializer
+    queryset = Profile.objects.all().select_related("owner")
