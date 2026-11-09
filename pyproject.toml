@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mind-drf-flex-fields"
-version = "1.0.1"
+version = "1.0.2"
 description = "Flexible, dynamic fields and nested resources for Django REST Framework serializers. Fork of drf-flex-fields, compatible with current DRF versions (no CoreAPI)."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.9"

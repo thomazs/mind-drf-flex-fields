@@ -5,7 +5,7 @@ All notable changes to this project are documented here.
 This project is a fork of [drf-flex-fields](https://github.com/rsinger86/drf-flex-fields);
 the upstream changelog is preserved in the [README](README.md#changelog).
 
-## Unreleased
+## 1.0.2 - 2026-11-09
 
 ### Fixed
 

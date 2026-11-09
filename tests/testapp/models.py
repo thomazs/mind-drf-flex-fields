@@ -52,3 +52,4 @@ class Profile(models.Model):
         Account, on_delete=models.CASCADE, related_name="profile"
     )
     employer = models.ForeignKey(Company, null=True, on_delete=models.CASCADE)
+    collaborators = models.ManyToManyField(Account, related_name="collaborations")

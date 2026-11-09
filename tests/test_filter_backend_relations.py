@@ -37,9 +37,7 @@ def _filtered(query_string=""):
     view.kwargs = {}
     view.action = "list"
 
-    return FlexFieldsFilterBackend().filter_queryset(
-        request, view.get_queryset(), view
-    )
+    return FlexFieldsFilterBackend().filter_queryset(request, view.get_queryset(), view)
 
 
 class ForwardSingleRelationTests(TestCase):
@@ -59,9 +57,20 @@ class ForwardSingleRelationTests(TestCase):
         self.assertTrue(campo.one_to_one)
         self.assertFalse(is_forward_single_relation(campo))
 
-    def test_many_to_many_is_not_a_forward_single_relation(self):
-        """`concrete` is True for a forward m2m, so `concrete` alone won't do."""
+    def test_reverse_foreign_key_is_not_a_forward_relation(self):
+        """`Company.person` is the reverse side of `Person.employer`."""
         campo = Company._meta.get_field("person")
+        self.assertTrue(campo.one_to_many)
+        self.assertFalse(is_forward_single_relation(campo))
+
+    def test_forward_many_to_many_is_not_a_forward_single_relation(self):
+        """
+        A forward m2m keeps no column on this table - it is a prefetch, not a
+        JOIN. Note that `concrete` is False for it, so the cardinality test is
+        what rules it out here, not `concrete`.
+        """
+        campo = Profile._meta.get_field("collaborators")
+        self.assertTrue(campo.many_to_many)
         self.assertFalse(is_forward_single_relation(campo))
 
 
