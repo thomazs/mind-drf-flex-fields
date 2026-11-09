@@ -1,0 +1,92 @@
+[build-system]
+requires = ["setuptools>=77.0.3", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mind-drf-flex-fields"
+version = "1.0"
+description = "Flexible, dynamic fields and nested resources for Django REST Framework serializers. Fork of drf-flex-fields, compatible with current DRF versions (no CoreAPI)."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Mindsight", email = "marcos.thomaz@mindsight.com.br" }]
+maintainers = [{ name = "Mindsight", email = "marcos.thomaz@mindsight.com.br" }]
+keywords = [
+    "django",
+    "django-rest-framework",
+    "drf",
+    "rest",
+    "api",
+    "dynamic fields",
+    "sparse fieldsets",
+    "serializers",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.0",
+    "Framework :: Django :: 5.1",
+    "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
+    "Framework :: Django :: 6.1",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "Django>=4.2",
+    "djangorestframework>=3.15",
+]
+
+[project.optional-dependencies]
+# Extras needed only if you generate OpenAPI schemas with DRF's built-in
+# generator and want the flex-fields query parameters documented.
+openapi = ["uritemplate>=4.1.1", "inflection>=0.5.1", "PyYAML>=6.0"]
+
+[project.scripts]
+# Deliberately a CLI, not a management command: it must run in projects that
+# cannot boot Django yet. See mind_flex_fields_migrate for why.
+mind-flex-fields-migrate = "mind_flex_fields_migrate:main"
+
+[project.urls]
+Homepage = "https://github.com/thomazs/mind-drf-flex-fields"
+Repository = "https://github.com/thomazs/mind-drf-flex-fields"
+Changelog = "https://github.com/thomazs/mind-drf-flex-fields/blob/main/CHANGELOG.md"
+"Upstream project" = "https://github.com/rsinger86/drf-flex-fields"
+
+[tool.setuptools]
+packages = ["mind_flex_fields"]
+# Top-level module so the migration CLI is importable without Django.
+py-modules = ["mind_flex_fields_migrate"]
+
+[tool.pytest.ini_options]
+# The test suite is a small DRF project under tests/; pytest-django wires it up.
+DJANGO_SETTINGS_MODULE = "tests.settings"
+# Puts the project root on sys.path so `tests.settings` and `tests.testapp`
+# are importable. pytest-django would otherwise look for a manage.py to infer
+# this, and there is none - this is a library, not a Django project.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config"
+# The smoke scripts under tests/ are run by tox (`wheel` / `shim`), not by
+# pytest; they do not match this pattern, so they are never collected.
+python_files = ["test_*.py"]
+
+[tool.black]
+target-version = ["py39"]
+
+[tool.isort]
+profile = "black"

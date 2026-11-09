@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=77.0.3", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mind-drf-flex-fields-compat"
+version = "1.0"
+description = "Temporary compatibility shim: makes the old `rest_flex_fields` import path resolve to `mind_flex_fields`."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Mindsight", email = "marcos.thomaz@mindsight.com.br" }]
+keywords = ["django", "django-rest-framework", "drf", "migration", "shim"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = ["mind-drf-flex-fields>=1.0"]
+
+[project.urls]
+# TODO: point these at the internal repository before the first upload.
+Homepage = "https://github.com/thomazs/mind-drf-flex-fields"
+Repository = "https://github.com/thomazs/mind-drf-flex-fields"
+
+[tool.setuptools]
+packages = ["rest_flex_fields"]

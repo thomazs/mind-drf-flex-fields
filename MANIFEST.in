@@ -1,0 +1,10 @@
+include LICENSE
+include README.md
+include CHANGELOG.md
+include requirements-dev.txt
+recursive-include tests *.py
+# The shim is a separate distribution, built from compat/ on its own.
+prune compat
+
+global-exclude *.py[cod]
+global-exclude __pycache__

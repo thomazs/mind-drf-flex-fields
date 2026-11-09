@@ -1,0 +1,101 @@
+name: Publish to PyPI
+
+# Publishes when a GitHub release is created, or on demand.
+#
+# Authentication uses PyPI Trusted Publishing (OIDC) - no API token secret is
+# needed. Configure the publisher once at:
+#   https://pypi.org/manage/project/mind-drf-flex-fields/settings/publishing/
+# If you prefer an API token instead, delete the `permissions:` block and add
+# `password: ${{ secrets.PYPI_API_TOKEN }}` to the publish step.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: "Target repository"
+        required: true
+        default: testpypi
+        type: choice
+        options: [testpypi, pypi]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip build twine
+
+      - name: Run tests before publishing
+        run: |
+          pip install Django djangorestframework pytest pytest-django \
+            uritemplate inflection PyYAML
+          python -m pytest
+
+      - name: Build distributions
+        run: |
+          python -m build
+          python -m build compat --outdir dist-compat
+
+      - name: Check distributions
+        run: |
+          python -m twine check --strict dist/*
+          python -m twine check --strict dist-compat/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-compat
+          path: dist-compat/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write # required for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-compat
+          path: dist-compat/
+
+      - name: Publish to TestPyPI
+        if: github.event_name == 'workflow_dispatch' && inputs.repository == 'testpypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+      - name: Publish to PyPI
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.repository == 'pypi')
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      # The shim is a separate PyPI project, so it needs its own upload (and
+      # its own trusted publisher configured on PyPI).
+      - name: Publish the compatibility shim to TestPyPI
+        if: github.event_name == 'workflow_dispatch' && inputs.repository == 'testpypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist-compat/
+
+      - name: Publish the compatibility shim to PyPI
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.repository == 'pypi')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-compat/

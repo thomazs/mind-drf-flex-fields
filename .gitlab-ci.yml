@@ -1,0 +1,217 @@
+# GitLab CI/CD for mind-drf-flex-fields
+#
+# Mirrors .github/workflows/test.yaml and .github/workflows/publish.yaml:
+#
+#   test     - the suite across the supported Django / DRF / Python matrix
+#   build    - both distributions (the library and the optional compat shim)
+#   publish  - uploads to TestPyPI (manual) or PyPI (on a tag, manual)
+#
+# Publishing authenticates in one of two ways, checked in this order:
+#
+#   1. PYPI_API_TOKEN / TESTPYPI_API_TOKEN - a masked, protected CI/CD variable
+#      holding a PyPI API token. Simplest to set up.
+#   2. Trusted Publishing (OIDC) - no stored secret. Configure a GitLab
+#      publisher for each project first, at
+#      https://pypi.org/manage/project/<name>/settings/publishing/
+#
+# The library and the shim are separate PyPI projects, so each one is published
+# by its own job with its own token.
+
+stages:
+  - test
+  - build
+  - publish
+
+default:
+  image: python:3.12
+  interruptible: true
+  cache:
+    key:
+      files:
+        - pyproject.toml
+    paths:
+      - .cache/pip
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+# --------------------------------------------------------------------------
+# test
+# --------------------------------------------------------------------------
+
+test:
+  stage: test
+  image: python:$PYTHON_VERSION
+  parallel:
+    matrix:
+      # The matrix itself lives in tox.ini; this only pairs each environment
+      # with the interpreter it needs. `tox -l` lists them all.
+      - PYTHON_VERSION: "3.13"
+        TOXENV: "py313-dj61-drf318"
+      - PYTHON_VERSION: "3.12"
+        TOXENV: "py312-dj61-drf318"
+      - PYTHON_VERSION: "3.12"
+        TOXENV: "py312-dj60-drf317,py312-dj60-drf318"
+      - PYTHON_VERSION: "3.12"
+        TOXENV: "py312-dj52-drf315,py312-dj52-drf316,py312-dj52-drf317,py312-dj52-drf318"
+      - PYTHON_VERSION: "3.12"
+        TOXENV: "py312-dj42-drf317"
+      - PYTHON_VERSION: "3.11"
+        TOXENV: "py311-dj50-drf316"
+      - PYTHON_VERSION: "3.10"
+        TOXENV: "py310-dj42-drf316,py310-dj52-drf318"
+      - PYTHON_VERSION: "3.9"
+        TOXENV: "py39-dj42-drf315,py39-dj42-drf316"
+  before_script:
+    - python -m pip install --upgrade pip tox tox-uv
+  script:
+    - python -m tox -e "$TOXENV"
+
+# Repo-level checks plus the environments that exercise the *installed*
+# distributions instead of the source tree.
+extras:
+  stage: test
+  script:
+    - python -m pip install --upgrade pip tox tox-uv
+    - python -m tox -e checks,wheel,shim
+
+# --------------------------------------------------------------------------
+# build
+# --------------------------------------------------------------------------
+
+build:
+  stage: build
+  script:
+    - python -m pip install --upgrade pip build twine
+    # The library.
+    - python -m build
+    - python -m twine check --strict dist/*
+    # The optional compatibility shim, a separate distribution.
+    - python -m build compat --outdir dist-compat
+    - python -m twine check --strict dist-compat/*
+    - ls -l dist dist-compat
+  artifacts:
+    name: "dist-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - dist/
+      - dist-compat/
+    expire_in: 1 week
+
+# --------------------------------------------------------------------------
+# publish
+# --------------------------------------------------------------------------
+
+.publish:
+  stage: publish
+  dependencies:
+    - build
+  variables:
+    # Overridden by each job below.
+    DIST_DIR: dist
+  before_script:
+    - python -m pip install --upgrade pip twine
+  script:
+    - |
+      set -euo pipefail
+
+      if [ -n "${API_TOKEN:-}" ]; then
+        echo "Authenticating with the API token from CI/CD variables."
+        TWINE_PASSWORD="$API_TOKEN"
+      else
+        echo "No API token set; minting a short-lived token via Trusted Publishing."
+        if [ -z "${PYPI_ID_TOKEN:-}" ]; then
+          echo "ERROR: neither an API token nor an OIDC id_token is available." >&2
+          echo "Set ${TOKEN_VARIABLE_HINT} as a masked CI/CD variable, or configure" >&2
+          echo "a GitLab trusted publisher for this project on PyPI." >&2
+          exit 1
+        fi
+        mint_response="$(
+          curl --fail --silent --show-error \
+            -X POST "${MINT_URL}" \
+            -H "Content-Type: application/json" \
+            -d "{\"token\": \"${PYPI_ID_TOKEN}\"}"
+        )" || {
+          echo "ERROR: ${MINT_URL} refused the request." >&2
+          echo "Check that a GitLab trusted publisher is configured for this" >&2
+          echo "project, and that it matches this repository and ref." >&2
+          exit 1
+        }
+
+        TWINE_PASSWORD="$(
+          printf '%s' "${mint_response}" \
+          | python -c 'import json,sys; print(json.load(sys.stdin)["token"])' \
+            2>/dev/null
+        )" || {
+          echo "ERROR: unexpected response from ${MINT_URL}:" >&2
+          echo "${mint_response}" >&2
+          exit 1
+        }
+      fi
+
+      export TWINE_USERNAME=__token__
+      export TWINE_PASSWORD
+      python -m twine upload --repository-url "${REPOSITORY_URL}" "${DIST_DIR}"/*
+
+# -- TestPyPI (manual, any branch) -----------------------------------------
+
+.testpypi:
+  extends: .publish
+  id_tokens:
+    PYPI_ID_TOKEN:
+      aud: testpypi
+  variables:
+    REPOSITORY_URL: "https://test.pypi.org/legacy/"
+    MINT_URL: "https://test.pypi.org/_/oidc/mint-token"
+    API_TOKEN: "$TESTPYPI_API_TOKEN"
+    TOKEN_VARIABLE_HINT: "TESTPYPI_API_TOKEN"
+  rules:
+    - when: manual
+      allow_failure: true
+
+publish:testpypi:
+  extends: .testpypi
+  variables:
+    DIST_DIR: dist
+
+publish:testpypi:compat:
+  extends: .testpypi
+  variables:
+    DIST_DIR: dist-compat
+
+# -- PyPI (tags only, manual) ----------------------------------------------
+
+.pypi:
+  extends: .publish
+  environment:
+    name: release
+    url: https://pypi.org/project/mind-drf-flex-fields/
+  id_tokens:
+    PYPI_ID_TOKEN:
+      aud: pypi
+  variables:
+    REPOSITORY_URL: "https://upload.pypi.org/legacy/"
+    MINT_URL: "https://pypi.org/_/oidc/mint-token"
+    API_TOKEN: "$PYPI_API_TOKEN"
+    TOKEN_VARIABLE_HINT: "PYPI_API_TOKEN"
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: manual
+      allow_failure: false
+    - when: never
+
+publish:pypi:
+  extends: .pypi
+  variables:
+    DIST_DIR: dist
+
+# The shim changes rarely and does not have to track the library's version,
+# so it is published on its own.
+publish:pypi:compat:
+  extends: .pypi
+  environment:
+    name: release
+    url: https://pypi.org/project/mind-drf-flex-fields-compat/
+  variables:
+    DIST_DIR: dist-compat

@@ -1,0 +1,26 @@
+# Development / test dependencies.
+# Runtime dependencies are declared in pyproject.toml.
+Django>=6.1,<7.0
+djangorestframework>=3.18,<4.0
+
+# Test runner
+pytest>=8.0
+pytest-django>=4.9
+
+# Runs the supported Django/DRF matrix (see tox.ini); tox-uv is optional
+# but builds the environments much faster.
+tox>=4.0
+tox-uv>=1.0
+
+# Needed by DRF's built-in OpenAPI schema generator (tested in tests/test_schema.py)
+uritemplate>=4.1.1
+inflection>=0.5.1
+PyYAML>=6.0
+
+# Packaging / release
+build>=1.2.1
+twine>=5.1.0
+
+# Formatting / linting
+black>=24.4.2
+isort>=5.13.2
